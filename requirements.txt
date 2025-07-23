@@ -1,0 +1,11 @@
+svgwrite
+cairosvg
+opencv-python
+numpy
+pandas
+fastapi
+uvicorn
+python-multipart
+python-jose[cryptography]
+torch
+torchvision
