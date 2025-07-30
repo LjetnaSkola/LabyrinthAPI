@@ -26,22 +26,22 @@ def process_image(image_name):
 
             # GORE?
             wall_region = binary[top:top + wall_size, left :left + round(block_w)]
-            if np.mean(wall_region) > 190:
+            if np.mean(wall_region) > 180:
                 directions_matrix[i][j].add('U')
 
             # DOLE?
             wall_region = binary[top + round(block_h):top + round(block_h) + wall_size, left:left + round(block_w)]
-            if np.mean(wall_region) > 190:
+            if np.mean(wall_region) > 180:
                 directions_matrix[i][j].add('D')
 
             # LIJEVO?
             wall_region = binary[top:top + round(block_h), left:left + wall_size]
-            if np.mean(wall_region) > 190:
+            if np.mean(wall_region) > 180:
                 directions_matrix[i][j].add('L')
 
             # DESNO?
             wall_region = binary[top:top + round(block_h) , left+ round(block_w):left + round(block_w) + wall_size]
-            if np.mean(wall_region) > 190:
+            if np.mean(wall_region) > 180:
                 directions_matrix[i][j].add('R')
     return directions_matrix
 
@@ -157,54 +157,55 @@ def wall_follower_clean(adjacency, start, goal, follow_left=True):
         'R': (0, 1),
     }
 
-    def get_direction_index(d):
-        return directions.index(d)
+    def turn_right(d): return directions[(directions.index(d) + 1) % 4]
+    def turn_left(d): return directions[(directions.index(d) - 1) % 4]
+    def turn_back(d): return directions[(directions.index(d) + 2) % 4]
 
     def move(pos, direction):
         dx, dy = delta[direction]
         return (pos[0] + dx, pos[1] + dy)
 
     current = start
+    current_dir = 'R'
     path = []
-    visited_edges = set()
-    current_dir = 'R'  # initial direction assumed
 
-    while current != goal:
-        dir_idx = get_direction_index(current_dir)
+    visited_states = []
+    step = 0
+    max_steps = 10000
+
+    while current != goal and step < max_steps:
+        state = (current, current_dir)
+        if state in visited_states:
+            break  # Infinite loop detected
+        visited_states.append(state)
+
+        step += 1
 
         if follow_left:
-            try_dirs = [
-                directions[(dir_idx - 1) % 4],
-                directions[dir_idx],
-                directions[(dir_idx + 1) % 4],
-                directions[(dir_idx + 2) % 4],
-            ]
+            check_dirs = [turn_left(current_dir), current_dir, turn_right(current_dir), turn_back(current_dir)]
         else:
-            try_dirs = [
-                directions[(dir_idx + 1) % 4],
-                directions[dir_idx],
-                directions[(dir_idx - 1) % 4],
-                directions[(dir_idx + 2) % 4],
-            ]
+            check_dirs = [turn_right(current_dir), current_dir, turn_left(current_dir), turn_back(current_dir)]
 
         moved = False
-        for d in try_dirs:
+        moved_back = False
+        for d in check_dirs:
             next_pos = move(current, d)
-            edge = (current, next_pos)
-            if next_pos in adjacency.get(current, []) and edge not in visited_edges:
-                visited_edges.add(edge)
-                visited_edges.add((next_pos, current))  # mark both directions
-                current = next_pos
+            if next_pos in adjacency.get(current, []):
                 current_dir = d
-                path.append(d)
+                current = next_pos
+                if not path or turn_back(d) != path[-1]:
+                    path.append(d)
+                else:
+                    moved_back = True
+                    path.pop(-1)
                 moved = True
                 break
 
         if not moved:
-            print("Stuck: no unvisited edge to follow wall")
-            break
+            break  # No possible moves
 
-    return path
+    return path, current, step
+
 
 
 def solve_maze(image_name):
@@ -215,7 +216,7 @@ def solve_maze(image_name):
     goal = (9, 7)
 
     path = wall_follower_clean(adj, start, goal)
-    return aggregate_directions(path)
+    return aggregate_directions(path[0])
 
 @click.command()
 @click.argument('image_name', required=True )
