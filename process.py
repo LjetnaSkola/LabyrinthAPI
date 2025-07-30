@@ -148,6 +148,65 @@ def aggregate_directions(direction_list):
 
     return aggregated
 
+def wall_follower_clean(adjacency, start, goal, follow_left=True):
+    directions = ['R', 'D', 'L', 'U']
+    delta = {
+        'U': (-1, 0),
+        'D': (1, 0),
+        'L': (0, -1),
+        'R': (0, 1),
+    }
+
+    def get_direction_index(d):
+        return directions.index(d)
+
+    def move(pos, direction):
+        dx, dy = delta[direction]
+        return (pos[0] + dx, pos[1] + dy)
+
+    current = start
+    path = []
+    visited_edges = set()
+    current_dir = 'R'  # initial direction assumed
+
+    while current != goal:
+        dir_idx = get_direction_index(current_dir)
+
+        if follow_left:
+            try_dirs = [
+                directions[(dir_idx - 1) % 4],
+                directions[dir_idx],
+                directions[(dir_idx + 1) % 4],
+                directions[(dir_idx + 2) % 4],
+            ]
+        else:
+            try_dirs = [
+                directions[(dir_idx + 1) % 4],
+                directions[dir_idx],
+                directions[(dir_idx - 1) % 4],
+                directions[(dir_idx + 2) % 4],
+            ]
+
+        moved = False
+        for d in try_dirs:
+            next_pos = move(current, d)
+            edge = (current, next_pos)
+            if next_pos in adjacency.get(current, []) and edge not in visited_edges:
+                visited_edges.add(edge)
+                visited_edges.add((next_pos, current))  # mark both directions
+                current = next_pos
+                current_dir = d
+                path.append(d)
+                moved = True
+                break
+
+        if not moved:
+            print("Stuck: no unvisited edge to follow wall")
+            break
+
+    return path
+
+
 def solve_maze(image_name):
     maze = process_image(image_name)
 
@@ -155,7 +214,7 @@ def solve_maze(image_name):
     start = (0, 0)
     goal = (9, 7)
 
-    path = wall_follower_directions(adj, start, goal)
+    path = wall_follower_clean(adj, start, goal)
     return aggregate_directions(path)
 
 @click.command()
